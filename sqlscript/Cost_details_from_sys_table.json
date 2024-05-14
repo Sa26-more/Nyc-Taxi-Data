@@ -1,0 +1,20 @@
+{
+	"name": "Cost_details_from_sys_table",
+	"properties": {
+		"folder": {
+			"name": "Demo"
+		},
+		"content": {
+			"query": "SELECT * FROM sys.dm_external_data_processed;",
+			"metadata": {
+				"language": "sql"
+			},
+			"currentConnection": {
+				"databaseName": "demo",
+				"poolName": "Built-in"
+			},
+			"resultLimit": 5000
+		},
+		"type": "SqlQuery"
+	}
+}
