@@ -1,0 +1,252 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"workspaceName": {
+			"type": "string",
+			"metadata": "Workspace name",
+			"defaultValue": "wnsynapse"
+		},
+		"wnsynapse-WorkspaceDefaultSqlServer_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'wnsynapse-WorkspaceDefaultSqlServer'",
+			"defaultValue": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=tcp:wnsynapse.sql.azuresynapse.net,1433;Initial Catalog=@{linkedService().DBName}"
+		},
+		"bing-covid-19-data_sasUri": {
+			"type": "secureString",
+			"metadata": "Secure string for 'sasUri' of 'bing-covid-19-data'"
+		},
+		"wnsynapse-WorkspaceDefaultStorage_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://practicestorageravi.dfs.core.windows.net"
+		}
+	},
+	"variables": {
+		"workspaceId": "[concat('Microsoft.Synapse/workspaces/', parameters('workspaceName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('workspaceName'), '/bing-covid-19-data')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobStorage",
+				"typeProperties": {
+					"sasUri": "[parameters('bing-covid-19-data_sasUri')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/wnsynapse-WorkspaceDefaultSqlServer')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"parameters": {
+					"DBName": {
+						"type": "String"
+					}
+				},
+				"annotations": [],
+				"type": "AzureSqlDW",
+				"typeProperties": {
+					"connectionString": "[parameters('wnsynapse-WorkspaceDefaultSqlServer_connectionString')]"
+				},
+				"connectVia": {
+					"referenceName": "AutoResolveIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/wnsynapse-WorkspaceDefaultStorage')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobFS",
+				"typeProperties": {
+					"url": "[parameters('wnsynapse-WorkspaceDefaultStorage_properties_typeProperties_url')]"
+				},
+				"connectVia": {
+					"referenceName": "AutoResolveIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/AutoResolveIntegrationRuntime')]",
+			"type": "Microsoft.Synapse/workspaces/integrationRuntimes",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"type": "Managed",
+				"typeProperties": {
+					"computeProperties": {
+						"location": "AutoResolve",
+						"dataFlowProperties": {
+							"computeType": "General",
+							"coreCount": 8,
+							"timeToLive": 0
+						}
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/WorkspaceSystemIdentity')]",
+			"type": "Microsoft.Synapse/workspaces/credentials",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"type": "ManagedIdentity",
+				"typeProperties": {}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/1_explore_taxi_zone')]",
+			"type": "Microsoft.Synapse/workspaces/sqlscripts",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "nyc_taxi/discovery"
+				},
+				"content": {
+					"query": "-- This is auto-generated code\nSELECT\n    TOP 100 *\nFROM\n    OPENROWSET(\n        BULK 'https://practicestorageravi.dfs.core.windows.net/nyc-taxi-data/raw/taxi_zone.csv',\n        FORMAT = 'CSV',\n        PARSER_VERSION = '2.0',\n        HEADER_ROW = TRUE,\n        FIELDTERMINATOR = ',',\n        ROWTERMINATOR = '\\n'\n    ) AS [result]\n\n\n--Examine the data type for the column\nEXEC sp_describe_first_result_set N'SELECT\n    TOP 100 *\nFROM\n    OPENROWSET(\n        BULK ''https://practicestorageravi.dfs.core.windows.net/nyc-taxi-data/raw/taxi_zone.csv'',\n        FORMAT = ''CSV'',\n        PARSER_VERSION = ''2.0'',\n        HEADER_ROW = TRUE\n    ) AS [result]'\n\n--Find the maximum length of each column elements\nSELECT\n    MAX(LEN(LocationID)) as Len_LocationID,\n    MAX(LEN(Borough)) as Len_Borough,\n    MAX(LEN(Zone)) as Len_Zone,\n    MAX(LEN(service_zone)) as Len_service_zone\nFROM\n    OPENROWSET(\n        BULK 'https://practicestorageravi.dfs.core.windows.net/nyc-taxi-data/raw/taxi_zone.csv',\n        FORMAT = 'CSV',\n        PARSER_VERSION = '2.0',\n        HEADER_ROW = TRUE,\n        FIELDTERMINATOR = ',',\n        ROWTERMINATOR = '\\n'\n    ) AS [result]\n\n--Change datatypes and give appropriate length to each columns.\n--LocationID SMALLINT, Borough VARCHAR(15), Zone VARCHAR(50), service_zone VARCHAR(15)\n--With ‘with clause’ provide explicit schema\nSELECT\n    *\nFROM\n    OPENROWSET(\n        BULK 'https://practicestorageravi.dfs.core.windows.net/nyc-taxi-data/raw/taxi_zone.csv',\n        FORMAT = 'CSV',\n        PARSER_VERSION = '2.0',\n        HEADER_ROW = TRUE,\n        FIELDTERMINATOR = ',',\n        ROWTERMINATOR = '\\n'\n    ) WITH (\n        LocationID SMALLINT, \n        Borough VARCHAR(15), \n        Zone VARCHAR(50), \n        service_zone VARCHAR(15)\n    ) AS [result]\n\n\n--Examine the data type for the column\nEXEC sp_describe_first_result_set N'SELECT\n    *\nFROM\n    OPENROWSET(\n        BULK ''https://practicestorageravi.dfs.core.windows.net/nyc-taxi-data/raw/taxi_zone.csv'',\n        FORMAT = ''CSV'',\n        PARSER_VERSION = ''2.0'',\n        HEADER_ROW = TRUE,\n        FIELDTERMINATOR = '','',\n        ROWTERMINATOR = ''\\n''\n    ) WITH (\n        LocationID SMALLINT, \n        Borough VARCHAR(15), \n        Zone VARCHAR(50), \n        service_zone VARCHAR(15)\n    ) AS [result]'\n\nSELECT name, collation_name FROM sys.databases;\n\n--Changing or specifying collation\nSELECT\n    *\nFROM\n    OPENROWSET(\n        BULK 'https://practicestorageravi.dfs.core.windows.net/nyc-taxi-data/raw/taxi_zone.csv',\n        FORMAT = 'CSV',\n        PARSER_VERSION = '2.0',\n        HEADER_ROW = TRUE,\n        FIELDTERMINATOR = ',',\n        ROWTERMINATOR = '\\n'\n    ) WITH (\n        LocationID SMALLINT, \n        Borough VARCHAR(15) COLLATE Latin1_General_100_CI_AI_SC_UTF8, \n        Zone VARCHAR(50) COLLATE Latin1_General_100_CI_AI_SC_UTF8, \n        service_zone VARCHAR(15) COLLATE Latin1_General_100_CI_AI_SC_UTF8\n    ) AS [result]\n\n--Create new database 'nyc_taxi_discovery'\nCREATE DATABASE nyc_taxi_discovery;\n\n--Use database nyc_taxi_discovery\nUSE nyc_taxi_discovery;\n\n--Specify collation on database\nALTER DATABASE nyc_taxi_discovery COLLATE Latin1_General_100_CI_AI_SC_UTF8;\n\n--Check collation type\nSELECT name, collation_name FROM sys.databases;\n\n--Select only subset of column\nSELECT\n    *\nFROM\n    OPENROWSET(\n        BULK 'https://practicestorageravi.dfs.core.windows.net/nyc-taxi-data/raw/taxi_zone.csv',\n        FORMAT = 'CSV',\n        PARSER_VERSION = '2.0',\n        HEADER_ROW = TRUE,\n        FIELDTERMINATOR = ',',\n        ROWTERMINATOR = '\\n'\n    ) WITH (\n        Borough VARCHAR(15), \n        Zone VARCHAR(50)\n    ) AS [result]\n\n--Read data from file without header\nSELECT *\nFROM\n    OPENROWSET(\n        BULK 'https://practicestorageravi.dfs.core.windows.net/nyc-taxi-data/raw/taxi_zone_without_header.csv',\n        FORMAT = 'CSV'\n\n    ) WITH (\n        Borough VARCHAR(15) 2, \n        Zone VARCHAR(50) 3\n    ) AS [result]\n\n--Making column name consistent\n\nSELECT\n    *\nFROM\nOPENROWSET(\n    BULK 'https://practicestorageravi.dfs.core.windows.net/nyc-taxi-data/raw/taxi_zone.csv',\n    FORMAT = 'CSV',\n    PARSER_VERSION = '2.0',\n    FIRSTROW = 2,\n    FIELDTERMINATOR = ',',\n    ROWTERMINATOR = '\\n'\n    ) WITH (\n        location_id SMALLINT 1, \n        borough VARCHAR(15) COLLATE Latin1_General_100_CI_AI_SC_UTF8 2, \n        zone VARCHAR(50) COLLATE Latin1_General_100_CI_AI_SC_UTF8 3, \n        service_zone VARCHAR(15) COLLATE Latin1_General_100_CI_AI_SC_UTF8 4\n    ) AS [result]\n\n--Check data type with sp_describe_first_result_set stored procedure\nEXEC sp_describe_first_result_set N'SELECT\n    *\nFROM\nOPENROWSET(\n    BULK ''https://practicestorageravi.dfs.core.windows.net/nyc-taxi-data/raw/taxi_zone.csv'',\n    FORMAT = ''CSV'',\n    PARSER_VERSION = ''2.0'',\n    FIRSTROW = 2,\n    FIELDTERMINATOR = '','',\n    ROWTERMINATOR = ''\\n''\n    ) WITH (\n        location_id SMALLINT 1, \n        borough VARCHAR(15) 2, \n        zone VARCHAR(50) 3, \n        service_zone VARCHAR(15) 4\n    ) AS [result]'\n\n--Whenever you will get error, change parser version to 1.0 to check error. And modify data type constraints accordingly.\n\n",
+					"metadata": {
+						"language": "sql"
+					},
+					"currentConnection": {
+						"databaseName": "nyc_taxi_discovery",
+						"poolName": "Built-in"
+					},
+					"resultLimit": 5000
+				},
+				"type": "SqlQuery"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/Cost_details_from_sys_table')]",
+			"type": "Microsoft.Synapse/workspaces/sqlscripts",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "Demo"
+				},
+				"content": {
+					"query": "SELECT * FROM sys.dm_external_data_processed;\n\nSELECT * FROM sys.configurations\nWHERE name LIKE 'Data Processed%';\n\n/* To configure cost control for serverless SQL pool in T-SQL using stored procedures.*/\n\nsp_set_data_processed_limit\n\t@type = N'daily',\n\t@limit_tb = 1;\n\nsp_set_data_processed_limit\n\t@type= N'weekly',\n\t@limit_tb = 2;\n\nsp_set_data_processed_limit\n\t@type= N'monthly',\n\t@limit_tb = 4;\n",
+					"metadata": {
+						"language": "sql"
+					},
+					"currentConnection": {
+						"databaseName": "demo",
+						"poolName": "Built-in"
+					},
+					"resultLimit": 5000
+				},
+				"type": "SqlQuery"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/Query CSV files')]",
+			"type": "Microsoft.Synapse/workspaces/sqlscripts",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "Demo"
+				},
+				"content": {
+					"query": "/* Covid-19 ECDC cases opendata set */\n\n/* Read a csv file */\nselect top 10 *\nfrom openrowset(\n    bulk 'https://pandemicdatalake.blob.core.windows.net/public/curated/covid-19/ecdc_cases/latest/ecdc_cases.csv',\n    format = 'csv',\n    parser_version = '2.0',\n    firstrow = 2) as rows\n\n\n\n/* Explicitly specify schema */\nselect top 10 *\nfrom openrowset(\n        bulk 'https://pandemicdatalake.blob.core.windows.net/public/curated/covid-19/ecdc_cases/latest/ecdc_cases.csv',\n        format = 'csv',\n        parser_version ='2.0',\n        firstrow = 2\n    ) with (\n        date_rep date 1,\n        cases int 5,\n        geo_id varchar(6) 8\n    ) as rows\n\n/* Windows style new line */\nSELECT *\nFROM OPENROWSET(\n        BULK 'https://sqlondemandstorage.blob.core.windows.net/public-csv/population/population.csv',\n        FORMAT = 'CSV', PARSER_VERSION = '2.0',\n        FIELDTERMINATOR =',',\n        ROWTERMINATOR = '\n'\n    )\nWITH (\n    [country_code] VARCHAR (5) COLLATE Latin1_General_BIN2,\n    [country_name] VARCHAR (100) COLLATE Latin1_General_BIN2,\n    [year] smallint,\n    [population] bigint\n) AS [r]\nWHERE\n    country_name = 'Luxembourg'\n    AND year = 2017;\n\n\n/* Unix-style new line */\nSELECT *\nFROM OPENROWSET(\n        BULK 'https://sqlondemandstorage.blob.core.windows.net/public-csv/population-unix/population.csv',\n        FORMAT = 'CSV', PARSER_VERSION = '2.0',\n        FIELDTERMINATOR =',',\n        ROWTERMINATOR = '0x0a'\n    )\nWITH (\n    [country_code] VARCHAR (5) COLLATE Latin1_General_BIN2,\n    [country_name] VARCHAR (100) COLLATE Latin1_General_BIN2,\n    [year] smallint,\n    [population] bigint\n) AS [r]\nWHERE\n    country_name = 'Luxembourg'\n    AND year = 2017;\n\n\n/* Header row */\nSELECT *\nFROM OPENROWSET(\n        BULK 'https://sqlondemandstorage.blob.core.windows.net/public-csv/population-unix-hdr/population.csv',\n        FORMAT = 'CSV', PARSER_VERSION = '2.0',\n        FIELDTERMINATOR =',',\n        FIRSTROW = 2\n    )\n    WITH (\n        [country_code] VARCHAR (5) COLLATE Latin1_General_BIN2,\n        [country_name] VARCHAR (100) COLLATE Latin1_General_BIN2,\n        [year] smallint,\n        [population] bigint\n    ) AS [r]\nWHERE\n    country_name = 'Luxembourg'\n    AND year = 2017;\n\n\n/* Custom quote character */\nSELECT *\nFROM OPENROWSET(\n        BULK 'https://sqlondemandstorage.blob.core.windows.net/public-csv/population-unix-hdr-quoted/population.csv',\n        FORMAT = 'CSV', PARSER_VERSION = '2.0',\n        FIELDTERMINATOR =',',\n        ROWTERMINATOR = '0x0a',\n        FIRSTROW = 2,\n        FIELDQUOTE = '\"'\n    )\n    WITH (\n        [country_code] VARCHAR (5) COLLATE Latin1_General_BIN2,\n        [country_name] VARCHAR (100) COLLATE Latin1_General_BIN2,\n        [year] smallint,\n        [population] bigint\n    ) AS [r]\nWHERE\n    country_name = 'Luxembourg'\n    AND year = 2017;\n\n\n/* Escape characters */\nSELECT *\nFROM OPENROWSET(\n        BULK 'https://sqlondemandstorage.blob.core.windows.net/public-csv/population-unix-hdr-escape/population.csv',\n        FORMAT = 'CSV', PARSER_VERSION = '2.0',\n        FIELDTERMINATOR =',',\n        ROWTERMINATOR = '0x0a',\n        FIRSTROW = 2,\n        ESCAPECHAR = ''\n    )\n    WITH (\n        [country_code] VARCHAR (5) COLLATE Latin1_General_BIN2,\n        [country_name] VARCHAR (100) COLLATE Latin1_General_BIN2,\n        [year] smallint,\n        [population] bigint\n    ) AS [r]\nWHERE\n    country_name = 'Slovenia';\n\n\n/* Escape quoting characters */\nSELECT *\nFROM OPENROWSET(\n        BULK 'https://sqlondemandstorage.blob.core.windows.net/public-csv/population-unix-hdr-escape-quoted/population.csv',\n        FORMAT = 'CSV', PARSER_VERSION = '2.0',\n        FIELDTERMINATOR =',',\n        ROWTERMINATOR = '0x0a',\n        FIRSTROW = 2\n    )\n    WITH (\n        [country_code] VARCHAR (5) COLLATE Latin1_General_BIN2,\n        [country_name] VARCHAR (100) COLLATE Latin1_General_BIN2,\n        [year] smallint,\n        [population] bigint\n    ) AS [r]\nWHERE\n    country_name = 'Slovenia';\n\n\n/* Tab-delimited files */\nSELECT *\nFROM OPENROWSET(\n        BULK 'https://sqlondemandstorage.blob.core.windows.net/public-csv/population-unix-hdr-tsv/population.csv',\n        FORMAT = 'CSV', PARSER_VERSION = '2.0',\n        FIELDTERMINATOR ='\t',\n        ROWTERMINATOR = '0x0a',\n        FIRSTROW = 2\n    )\n    WITH (\n        [country_code] VARCHAR (5) COLLATE Latin1_General_BIN2,\n        [country_name] VARCHAR (100) COLLATE Latin1_General_BIN2,\n        [year] smallint,\n        [population] bigint\n    ) AS [r]\nWHERE\n    country_name = 'Luxembourg'\n    AND year = 2017\n\n\n/* Return a subset of columns */\nSELECT\n    COUNT(DISTINCT country_name) AS countries\nFROM OPENROWSET(\n        BULK 'https://sqlondemandstorage.blob.core.windows.net/public-csv/population/population.csv',\n        FORMAT = 'CSV', PARSER_VERSION = '2.0',\n        FIELDTERMINATOR =',',\n        ROWTERMINATOR = '\n'\n    )\nWITH (\n    --[country_code] VARCHAR (5),\n    [country_name] VARCHAR (100) 2\n    --[year] smallint,\n    --[population] bigint\n) AS [r]\n\nSELECT *\nFROM OPENROWSET(\n    BULK 'https://pandemicdatalake.blob.core.windows.net/public/curated/covid-19/ecdc_cases/latest/ecdc_cases.csv',\n    FORMAT = 'CSV', PARSER_VERSION = '2.0',\n    FIELDTERMINATOR =',',\n    HEADER_ROW = TRUE\n    ) AS [r]\n",
+					"metadata": {
+						"language": "sql"
+					},
+					"currentConnection": {
+						"databaseName": "demo",
+						"poolName": "Built-in"
+					},
+					"resultLimit": 5000
+				},
+				"type": "SqlQuery"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/Query Parquet files')]",
+			"type": "Microsoft.Synapse/workspaces/sqlscripts",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "Demo"
+				},
+				"content": {
+					"query": "/* Covid-19 ECDC cases opendata set */\n\n/* Read parquet file */\nSELECT TOP 10 *\nFROM OPENROWSET(\n    BULK 'https://pandemicdatalake.blob.core.windows.net/public/curated/covid-19/ecdc_cases/latest/ecdc_cases.parquet',\n    FORMAT = 'parquet') as rows\n\n\n/* Explicitly specify schema */\nSELECT TOP 10 *\nFROM OPENROWSET(\n        BULK 'https://pandemicdatalake.blob.core.windows.net/public/curated/covid-19/ecdc_cases/latest/ecdc_cases.parquet',\n        FORMAT = 'parquet'\n    ) WITH ( date_rep date, cases int, geo_id varchar(6) ) as rows\n\n\n/* New York City Taxi opendata set */\n\n/* Query set of parquet files */\nSELECT\n    YEAR(tpepPickupDateTime),\n    passengerCount,\n    COUNT(*) AS cnt\nFROM\n    OPENROWSET(\n        BULK 'https://azureopendatastorage.blob.core.windows.net/nyctlc/yellow/puYear=2018/puMonth=*/*.snappy.parquet',\n        FORMAT='PARQUET'\n    ) WITH (\n        tpepPickupDateTime DATETIME2,\n        passengerCount INT\n    ) AS nyc\nGROUP BY\n    passengerCount,\n    YEAR(tpepPickupDateTime)\nORDER BY\n    YEAR(tpepPickupDateTime),\n    passengerCount;\n\n\n/* Automatic schema inference */\nSELECT TOP 10 *\nFROM\n    OPENROWSET(\n        BULK 'https://azureopendatastorage.blob.core.windows.net/nyctlc/yellow/puYear=2018/puMonth=*/*.snappy.parquet',\n        FORMAT='PARQUET'\n    ) AS nyc\n\n\n/* Query partitioned data */\nSELECT\n    YEAR(tpepPickupDateTime),\n    passengerCount,\n    COUNT(*) AS cnt\nFROM\n    OPENROWSET(\n        BULK 'https://azureopendatastorage.blob.core.windows.net/nyctlc/yellow/puYear=*/puMonth=*/*.snappy.parquet',\n        FORMAT='PARQUET'\n    ) nyc\nWHERE\n    nyc.filepath(1) = 2017\n    AND nyc.filepath(2) IN (1, 2, 3)\n    AND tpepPickupDateTime BETWEEN CAST('1/1/2017' AS datetime) AND CAST('3/31/2017' AS datetime)\nGROUP BY\n    passengerCount,\n    YEAR(tpepPickupDateTime)\nORDER BY\n    YEAR(tpepPickupDateTime),\n    passengerCount;\n",
+					"metadata": {
+						"language": "sql"
+					},
+					"currentConnection": {
+						"databaseName": "demo",
+						"poolName": "Built-in"
+					},
+					"resultLimit": 5000
+				},
+				"type": "SqlQuery"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/demo_query')]",
+			"type": "Microsoft.Synapse/workspaces/sqlscripts",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "Demo"
+				},
+				"content": {
+					"query": "SELECT 'Ravi';",
+					"metadata": {
+						"language": "sql"
+					},
+					"currentConnection": {
+						"databaseName": "master",
+						"poolName": "Built-in"
+					},
+					"resultLimit": 5000
+				},
+				"type": "SqlQuery"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/first_sql_query')]",
+			"type": "Microsoft.Synapse/workspaces/sqlscripts",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "Demo"
+				},
+				"content": {
+					"query": "-- This is auto-generated code\nSELECT\n    TOP 100 *\nFROM\n    OPENROWSET(\n        BULK 'https://practicestorageravi.dfs.core.windows.net/input/moviesDB.csv',\n        FORMAT = 'CSV',\n        HEADER_ROW = TRUE,\n        PARSER_VERSION = '2.0'\n    ) AS [result]\n",
+					"metadata": {
+						"language": "sql"
+					},
+					"currentConnection": {
+						"databaseName": "master",
+						"poolName": "Built-in"
+					},
+					"resultLimit": 5000
+				},
+				"type": "SqlQuery"
+			},
+			"dependsOn": []
+		}
+	]
+}
