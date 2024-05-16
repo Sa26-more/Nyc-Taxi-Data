@@ -5,7 +5,7 @@
 			"name": "nyc_taxi/discovery"
 		},
 		"content": {
-			"query": "USE nyc_taxi_discovery;\n\n",
+			"query": "USE nyc_taxi_discovery;\n\nSELECT \n    rate_code_id, rate_code\nFROM\nOPENROWSET(\n    BULK 'rate_code.json',\n    DATA_SOURCE = 'nyc_taxi_data_raw',\n    FORMAT = 'CSV',\n    FIELDTERMINATOR = '0x0b',\n    FIELDQUOTE = '0x0b',\n    ROWTERMINATOR = '0x0b'\n)\nWITH (\n    RateJson NVARCHAR(MAX)\n) AS rate\nCROSS APPLY OPENJSON (RateJson)\nWITH (\n    rate_code_id TINYINT,\n    rate_code VARCHAR(50)\n);\n\n",
 			"metadata": {
 				"language": "sql"
 			},
