@@ -1,11 +1,11 @@
 {
-	"name": "10_data_quality_check",
+	"name": "11_data_quality_check",
 	"properties": {
 		"folder": {
 			"name": "nyc_taxi/discovery"
 		},
 		"content": {
-			"query": "USE nyc_taxi_discovery;\n\n--Identify any data quality issues in trip total amount\n",
+			"query": "USE nyc_taxi_discovery;\n\n--Identify any data quality issues in trip total amount\nSELECT\n    min(total_amount) as min_total_amount,\n    max(total_amount) as max_total_amount,\n    avg(total_amount) as avg_total_amount,\n    count(*) as total_number_of_records,\n    count(total_amount) as not_null_total_number_of_records\nFROM\n    OPENROWSET(\n        BULK 'trip_data_green_parquet/**',\n        DATA_SOURCE = 'nyc_taxi_data_raw',\n        FORMAT = 'PARQUET'\n    ) AS [result];\n\n--check negative total_amount\nSELECT\n    count(*) as total_negative_payment\nFROM\n    OPENROWSET(\n        BULK 'trip_data_green_parquet/**',\n        DATA_SOURCE = 'nyc_taxi_data_raw',\n        FORMAT = 'PARQUET'\n    ) AS [result]\nWHERE total_amount < 0;\n\n--check payment type for negative total amount\nSELECT\n    DISTINCT payment_type,\n    count(*) as total_count\nFROM\n    OPENROWSET(\n        BULK 'trip_data_green_parquet/**',\n        DATA_SOURCE = 'nyc_taxi_data_raw',\n        FORMAT = 'PARQUET'\n    ) AS [result]\nWHERE total_amount < 0\nGROUP BY payment_type\nORDER BY payment_type;\n\n--Check payment types 'NULL', 2, 3, 4\nselect\n    payment_type,\n    description\nfrom openrowset(\n        bulk 'payment_type.json',\n        data_source = 'nyc_taxi_data_raw',\n        format = 'csv',\n        fieldterminator ='0x0b',\n        fieldquote = '0x0b'\n    ) with (JsonData nvarchar(max)) as payment_type\ncross apply openjson (JsonData)\n    with (  payment_type tinyint,\n            description varchar(20) '$.payment_type_desc');\n",
 			"metadata": {
 				"language": "sql"
 			},
