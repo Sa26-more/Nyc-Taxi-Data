@@ -1,0 +1,17 @@
+{
+	"name": "practice_data_virtualization",
+	"properties": {
+		"content": {
+			"query": "\nCREATE DATABASE SCOPED CREDENTIAL MyC\nWITH IDENTITY = 'SHARED ACCESS SIGNATURE',\nSECRET = 'sv=2022-11-02&ss=bfqt&srt=sco&sp=rlx&se=2024-05-17T10:23:09Z&st=2024-05-17T02:23:09Z&spr=https&sig=sjE84HS3hXz6iAgXTePmMHVIuMTA1UC1sguX6PNM%2F1k%3D'\n\nGO\n\nCREATE EXTERNAL DATA SOURCE MyExt\nWITH (\n    LOCATION = 'abfss://input@practicestorageravi.dfs.core.windows.net',\n    CREDENTIAL = MyC\n)\n\nGO\n\nSELECT TOP 10 *\nFROM OPENROWSET(\n BULK '*.parquet',\n DATA_SOURCE = 'MyExt',\n FORMAT = 'parquet'\n) AS filerows;\n",
+			"metadata": {
+				"language": "sql"
+			},
+			"currentConnection": {
+				"databaseName": "nyc_taxi_discovery",
+				"poolName": "Built-in"
+			},
+			"resultLimit": 5000
+		},
+		"type": "SqlQuery"
+	}
+}
