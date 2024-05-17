@@ -5,7 +5,7 @@
 			"name": "nyc_taxi/ldw"
 		},
 		"content": {
-			"query": "USE nyc_taxi_ldw\nGO\n\nCREATE EXTERNAL DATA SOURCE nyc_taxi_src1 WITH (\n    LOCATION = 'https://practicestorageravi.dfs.core.windows.net/nyc-taxi-data',\n);\n",
+			"query": "USE nyc_taxi_ldw\nGO\nIF NOT EXISTS (SELECT * FROM sys.external_data_sources WHERE name = 'nyc_taxi_src1')\n    CREATE EXTERNAL DATA SOURCE nyc_taxi_src1 WITH (\n        LOCATION = 'https://practicestorageravi.dfs.core.windows.net/nyc-taxi-data',\n    );\n",
 			"metadata": {
 				"language": "sql"
 			},
