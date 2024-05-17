@@ -1,0 +1,20 @@
+{
+	"name": "2_create_external_data_sources",
+	"properties": {
+		"folder": {
+			"name": "nyc_taxi/ldw"
+		},
+		"content": {
+			"query": "USE nyc_taxi_discovery\nGO\n\nCREATE EXTERNAL DATA SOURCE nyc_taxi_src WITH (\n    LOCATION = 'adls://nyc-taxi-data@practicestorageravi.dfs.core.windows.net',\n);\n",
+			"metadata": {
+				"language": "sql"
+			},
+			"currentConnection": {
+				"databaseName": "nyc_taxi_discovery",
+				"poolName": "Built-in"
+			},
+			"resultLimit": 5000
+		},
+		"type": "SqlQuery"
+	}
+}
