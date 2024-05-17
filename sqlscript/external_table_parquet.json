@@ -1,0 +1,17 @@
+{
+	"name": "external_table_parquet",
+	"properties": {
+		"content": {
+			"query": "IF NOT EXISTS (SELECT * FROM sys.external_file_formats WHERE name = 'SynapseParquetFormat') \n\tCREATE EXTERNAL FILE FORMAT [SynapseParquetFormat] \n\tWITH ( FORMAT_TYPE = PARQUET)\nGO\n\nCREATE DATABASE SCOPED CREDENTIAL MyEx\nWITH IDENTITY = 'SHARED ACCESS SIGNATURE',\nSECRET = 'sv=2022-11-02&ss=bfqt&srt=co&sp=rwdlacupyx&se=2024-05-17T11:28:14Z&st=2024-05-17T03:28:14Z&spr=https&sig=a6gsTCCpVSnZ3yNYCpXvMDeqH52%2FIwRzYeoANLFa7fk%3D'\n\nIF NOT EXISTS (SELECT * FROM sys.external_data_sources WHERE name = 'input_practicestorageravi_dfs_core_windows_net') \n\tCREATE EXTERNAL DATA SOURCE [input_practicestorageravi_dfs_core_windows_net] \n\tWITH (\n\t\tLOCATION = 'abfss://input@dummystoragepractice.dfs.core.windows.net',\n\t\tCREDENTIAL = MyEx\n\t)\nGO\n\nGO\n\nCREATE EXTERNAL TABLE demo.standing1 (\n\t[Rank] int,\n\t[Team] nvarchar(4000),\n\t[Wins] bigint,\n\t[Points] float,\n\t[season] nvarchar(4000)\n\t)\n\tWITH (\n\tLOCATION = 'formulaone/standing.parquet',\n\tDATA_SOURCE = [input_practicestorageravi_dfs_core_windows_net],\n\tFILE_FORMAT = [SynapseParquetFormat]\n\t)\nGO\n\n\nSELECT TOP 100 * FROM demo.standing1\nGO",
+			"metadata": {
+				"language": "sql"
+			},
+			"currentConnection": {
+				"databaseName": "nyc_taxi_discovery",
+				"poolName": "Built-in"
+			},
+			"resultLimit": 5000
+		},
+		"type": "SqlQuery"
+	}
+}
