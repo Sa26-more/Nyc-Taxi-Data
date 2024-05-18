@@ -1,0 +1,20 @@
+{
+	"name": "11_silver_payment_type",
+	"properties": {
+		"folder": {
+			"name": "nyc_taxi/ldw"
+		},
+		"content": {
+			"query": "USE nyc_taxi_ldw\n\nGO\n\nIF OBJECT_ID('silver.payment_type') IS NOT NULL\n    DROP EXTERNAL TABLE silver.payment_type\n\nGO\n\nCREATE EXTERNAL TABLE silver.payment_type\nWITH\n(\n    DATA_SOURCE = nyc_taxi_src1,\n    FILE_FORMAT = parquet_file_format,\n    LOCATION = 'silver/payment_type',\n)\nAS \nselect\n    payment_type,\n    description\nfrom openrowset(\n        bulk 'raw/payment_type.json',\n        data_source = 'nyc_taxi_src1',\n        format = 'csv',\n        fieldterminator ='0x0b',\n        fieldquote = '0x0b'\n    ) with (JsonData nvarchar(max)) as payment_type\n    cross apply openjson (JsonData)\n        with (  payment_type tinyint,\n                description varchar(20) '$.payment_type_desc')\n\nGO \n\nSELECT * FROM silver.payment_type;",
+			"metadata": {
+				"language": "sql"
+			},
+			"currentConnection": {
+				"databaseName": "master",
+				"poolName": "Built-in"
+			},
+			"resultLimit": 5000
+		},
+		"type": "SqlQuery"
+	}
+}
