@@ -410,6 +410,29 @@
 			"dependsOn": []
 		},
 		{
+			"name": "[concat(parameters('workspaceName'), '/5_create_bronze_view')]",
+			"type": "Microsoft.Synapse/workspaces/sqlscripts",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "nyc_taxi/ldw"
+				},
+				"content": {
+					"query": "USE nyc_taxi_ldw\n\nGO\nDROP VIEW IF EXISTS bronze.vw_rate_code\n\nGO\nCREATE VIEW bronze.vw_rate_code\nAS\nSELECT \n    rate_code_id, rate_code\nFROM\nOPENROWSET(\n    BULK 'raw/rate_code.json',\n    DATA_SOURCE = 'nyc_taxi_src1',\n    FORMAT = 'CSV',\n    FIELDTERMINATOR = '0x0b',\n    FIELDQUOTE = '0x0b',\n    ROWTERMINATOR = '0x0b'\n)\nWITH (\n    RateJson NVARCHAR(MAX)\n) AS rate\nCROSS APPLY OPENJSON (RateJson)\nWITH (\n    rate_code_id TINYINT,\n    rate_code VARCHAR(50)\n)\n\nGO\n\nSELECT * FROM bronze.vw_rate_code\n\nGO\n\nDROP VIEW IF EXISTS bronze.vw_payment_type\nGO\nCREATE VIEW bronze.vw_payment_type\nAS\nselect\n    payment_type,\n    description\nfrom openrowset(\n        bulk 'raw/payment_type.json',\n        data_source = 'nyc_taxi_src1',\n        format = 'csv',\n        fieldterminator ='0x0b',\n        fieldquote = '0x0b'\n    ) with (JsonData nvarchar(max)) as payment_type\n    cross apply openjson (JsonData)\n        with (  payment_type tinyint,\n                description varchar(20) '$.payment_type_desc')\n\nGO\n\nSELECT * FROM bronze.vw_payment_type\n\nGO\n\n--Create a view for trip_data_green\nDROP VIEW IF EXISTS bronze.vw_trip_data_green_csv\nGO \nCREATE VIEW bronze.vw_trip_data_green_csv\nAS\nSELECT\n    *\nFROM\n    OPENROWSET(\n        BULK 'raw/trip_data_green_csv/year=*/month=*/*.csv',\n        DATA_SOURCE = 'nyc_taxi_src1', --case sensitivity\n        FORMAT = 'CSV',\n        PARSER_VERSION = '2.0',\n        HEADER_ROW = TRUE\n    ) with (\n    VendorID INT,\n    lpep_pickup_datetime datetime2(7),\n    lpep_dropoff_datetime datetime2(7),\n    store_and_fwd_flag CHAR(1),\n    RatecodeID INT,\n    PULocationID INT,\n    DOLocationID INT,\n    passenger_count INT,\n    trip_distance FLOAT,\n    fare_amount FLOAT,\n    extra FLOAT,\n    mta_tax FLOAT,\n    tip_amount FLOAT,\n    tolls_amount FLOAT,\n    ehail_fee INT,\n    improvement_surcharge FLOAT,\n    total_amount FLOAT,\n    payment_type INT,\n    trip_type INT,\n    congestion_surcharge FLOAT,\n    year VARCHAR(4),\n    month VARCHAR(4)\n) AS [result]\n\nGO\nSELECT TOP 100 * FROM bronze.vw_trip_data_green_csv\n--WHERE year = '2020' AND month IN ('09','10')",
+					"metadata": {
+						"language": "sql"
+					},
+					"currentConnection": {
+						"databaseName": "nyc_taxi_ldw",
+						"poolName": "Built-in"
+					},
+					"resultLimit": 5000
+				},
+				"type": "SqlQuery"
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('workspaceName'), '/5_payment_type')]",
 			"type": "Microsoft.Synapse/workspaces/sqlscripts",
 			"apiVersion": "2019-06-01-preview",
@@ -714,29 +737,6 @@
 					},
 					"currentConnection": {
 						"databaseName": "nyc_taxi_discovery",
-						"poolName": "Built-in"
-					},
-					"resultLimit": 5000
-				},
-				"type": "SqlQuery"
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('workspaceName'), '/5_create_bronze_view')]",
-			"type": "Microsoft.Synapse/workspaces/sqlscripts",
-			"apiVersion": "2019-06-01-preview",
-			"properties": {
-				"folder": {
-					"name": "nyc_taxi/ldw"
-				},
-				"content": {
-					"query": "USE nyc_taxi_ldw\n\nGO\nDROP VIEW IF EXISTS bronze.vw_rate_code\n\nGO\nCREATE VIEW bronze.vw_rate_code\nAS\nSELECT \n    rate_code_id, rate_code\nFROM\nOPENROWSET(\n    BULK 'raw/rate_code.json',\n    DATA_SOURCE = 'nyc_taxi_src1',\n    FORMAT = 'CSV',\n    FIELDTERMINATOR = '0x0b',\n    FIELDQUOTE = '0x0b',\n    ROWTERMINATOR = '0x0b'\n)\nWITH (\n    RateJson NVARCHAR(MAX)\n) AS rate\nCROSS APPLY OPENJSON (RateJson)\nWITH (\n    rate_code_id TINYINT,\n    rate_code VARCHAR(50)\n)\n\nGO\n\nSELECT * FROM bronze.vw_rate_code\n\nGO\n\nDROP VIEW IF EXISTS bronze.vw_payment_type\nGO\nCREATE VIEW bronze.vw_payment_type\nAS\nselect\n    payment_type,\n    description\nfrom openrowset(\n        bulk 'raw/payment_type.json',\n        data_source = 'nyc_taxi_src1',\n        format = 'csv',\n        fieldterminator ='0x0b',\n        fieldquote = '0x0b'\n    ) with (JsonData nvarchar(max)) as payment_type\n    cross apply openjson (JsonData)\n        with (  payment_type tinyint,\n                description varchar(20) '$.payment_type_desc')\n\nGO\n\nSELECT * FROM bronze.vw_payment_type;",
-					"metadata": {
-						"language": "sql"
-					},
-					"currentConnection": {
-						"databaseName": "nyc_taxi_ldw",
 						"poolName": "Built-in"
 					},
 					"resultLimit": 5000
